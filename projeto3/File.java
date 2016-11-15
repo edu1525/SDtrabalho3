@@ -68,6 +68,12 @@ public class File {
         return null; // Nao encontrou
     }
 
+    public ArrayList<File> getChildren(){
+        return this.child;
+
+
+    }
+
     public boolean hasChild() {
         return this.child.size() != 0;
     }
