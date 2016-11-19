@@ -8,10 +8,9 @@ import org.apache.thrift.server.TServer.Args;
 import org.apache.thrift.server.TSimpleServer;
 import org.apache.thrift.transport.TServerSocket;
 import org.apache.thrift.transport.TServerTransport;
+import org.apache.thrift.TException;
 
 
-
-import java.io.IOException;
 
 public class HTTPServer implements Server.Iface{
     private int serverName;
@@ -21,8 +20,12 @@ public class HTTPServer implements Server.Iface{
     private ServerSocket socket;
     private FileTree ft = new FileTree();
     private boolean isOnline = true;
+    private Server.Processor processor;
+
 
     public HTTPServer(int port, int serverName) throws IOException {
+
+        processor = new Server.Processor(this);
 
         this.port = port;
         this.serverName = serverName;
@@ -33,6 +36,8 @@ public class HTTPServer implements Server.Iface{
         ft.addFile("/a/c", "cccccc");
         ft.addFile("/b/d", "ddddddd");
         //*/
+
+        /*
         try {
             // Cria um socket para o servidor na porta recebida
             this.socket = new ServerSocket(port);
@@ -42,18 +47,43 @@ public class HTTPServer implements Server.Iface{
             System.err.println("Could not create server on port " + port);
             System.exit(-1);
         }
-        while (this.isOnline) {
+        */
+       // while (this.isOnline) {
             // Cria um socket para o cliente e espera uma requisicao
-            System.err.println("Waiting for connection...");
-            Socket client = this.socket.accept();
-            System.err.println("Accepted connection from client " +
-            client.getInetAddress().toString());
+            //System.err.println("Waiting for connection...");
+            //Socket client = this.socket.accept();
+            //System.err.println("Accepted connection from client " +
+            //client.getInetAddress().toString());
             // Dispara uma thread para atender a requisicao e aguarda uma proxima
-            new Thread(new Request(this, client)).start();
-        }
-        System.err.println("Server halting...");
-        this.socket.close();
+            //new Thread(new Request(this, client)).start();
+
+            Runnable run = new Runnable(){
+                public void run(){
+                    simple(processor, port);
+
+                } 
+
+            };
+
+            
+        //}
+        new Thread (run).start();
+
+        //System.err.println("Server halting...");
+        //this.socket.close();
     }
+
+     public void simple(Server.Processor processor, int port) {
+        try {
+          TServerTransport serverTransport = new TServerSocket(port);
+          TServer server = new TSimpleServer(new Args(serverTransport).processor(processor));
+
+          System.out.println("Starting server "+serverName+"...");
+          server.serve();
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+  }
 
     public File getFile(String filepath) {
         return this.ft.getFile(filepath);
