@@ -1,44 +1,50 @@
 import java.util.ArrayList;
 import java.io.IOException;
+import org.apache.thrift.server.TServer;
+import org.apache.thrift.server.TServer.Args;
+import org.apache.thrift.server.TSimpleServer;
+import org.apache.thrift.transport.TServerSocket;
+import org.apache.thrift.transport.TServerTransport;
 import org.apache.thrift.TException;
 
-public class Servers {
-	private static ArrayList<HTTPServer> servers;
+public class Servers implements Server.Iface {
+	private HashMap<int, int> servers = new HashMap<int, int>();
+	private int serverCont = 0;
 
 	public static void main(String[] args) throws IOException {
-		servers = new ArrayList<HTTPServer>();
-
-		HTTPServer s1 = new HTTPServer(7000, 0);
-		HTTPServer s2 = new HTTPServer(8000, 1);
-		HTTPServer s3 = new HTTPServer(9000, 2);
-
-		servers.add(s1);
-		servers.add(s2);
-		servers.add(s3);
-
-		try {
-			ADD("/user", "eduardo");
-			ADD("/user/age", "21 anos");
-			System.out.println(GET("/user") + " - \n" +GET("/user/age"));
-		} catch (TException e) {
-			e.printStackTrace();
-		}
+		Servers s = new Servers();
+		s.createManager(Integer.parseInt(args[0]));
 	}
 
-	public static void setServer(int port, int serverName) {
-		try {
-			HTTPServer server = new HTTPServer(port, serverName);
-			servers.add(server);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+	private void createManager(int port) {
+        Server.Processor processor = new Server.Processor(this);
+        Runnable run = new Runnable() {
+            public void run() {
+                try {
+                    TServerTransport serverTransport = new TServerSocket(port);
+                    TServer server = new TSimpleServer(
+                        new Args(serverTransport).processor(processor)
+                    );
+                    //System.out.println("Starting server " + this.serverName + "...");
+                    server.serve();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+        new Thread(run).start();
+    }
+
+	@Override
+	public void CREATE(int port, int name) {
+		servers.put(name, port);
 	}
 
-	public static HTTPServer getServer(int serverName) {
+	public int getPort(int serverName) {
 		return servers.get(serverName);
 	}
 
-	public static String GET(String path)
+	public String GET(String path)
 	throws org.apache.thrift.TException {
 		int hash = path.hashCode() % servers.size();
 
@@ -55,56 +61,30 @@ public class Servers {
 		return null;
 	}
 
-    public static String LIST(String path) throws org.apache.thrift.TException {
-    	for (HTTPServer server : servers) {
-    		String r = server.LIST(path);
-			if (r != null)
-				return r;
-		}
+    public String LIST(String path) throws org.apache.thrift.TException {
 		return null;
     }
 
-    public static boolean ADD(String path, String data)
+    public boolean ADD(String path, String data)
 	throws org.apache.thrift.TException {
-    	int hash = (path.hashCode() % servers.size());
-    	HTTPServer server = getServer(hash);
-
-    	System.out.println("Dado inserido no servidor " + server.getServerName());
-
-    	return server.ADD(path, data);
+    	return false;
     }
 
-    public static boolean UPDATE(String path, String data)
+    public boolean UPDATE(String path, String data)
 	throws org.apache.thrift.TException {
-    	for (HTTPServer server : servers) {
-    		boolean r = server.UPDATE(path, data);
-			if (r) return true;
-		}
 		return false;
     }
 
-    public static boolean DELETE(String path) throws org.apache.thrift.TException {
-    	for (HTTPServer server : servers){
-			boolean r = server.DELETE(path);
-			if (r) return true;
-		}
+    public boolean DELETE(String path) throws org.apache.thrift.TException {
 		return false;
     }
 
-    public static boolean UPDATE_VERSION(String path, String data, int version) throws org.apache.thrift.TException{
-    	for (HTTPServer server : servers){
-			boolean r = server.UPDATE_VERSION(path, data, version);
-			if (r) return true;
-		}
+    public boolean UPDATE_VERSION(String path, String data, int version) throws org.apache.thrift.TException{
 		return false;
     }
 
-    public static boolean DELETE_VERSION(String path, int version) throws
+    public boolean DELETE_VERSION(String path, int version) throws
 	org.apache.thrift.TException {
-    	for (HTTPServer server : servers) {
-			boolean r = server.DELETE_VERSION(path, version);
-			if (r) return true;
-		}
 		return false;
     }
 

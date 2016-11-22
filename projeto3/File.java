@@ -70,8 +70,6 @@ public class File {
 
     public ArrayList<File> getChildren(){
         return this.child;
-
-
     }
 
     public boolean hasChild() {

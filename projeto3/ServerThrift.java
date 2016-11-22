@@ -2,6 +2,9 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.io.IOException;
+import java.io.FileReader;
+import java.io.BufferedReader;
+import java.util.HashMap;
 
 import org.apache.thrift.server.TServer;
 import org.apache.thrift.server.TServer.Args;
@@ -9,8 +12,12 @@ import org.apache.thrift.server.TSimpleServer;
 import org.apache.thrift.transport.TServerSocket;
 import org.apache.thrift.transport.TServerTransport;
 import org.apache.thrift.TException;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.apache.thrift.protocol.TProtocol;
+import org.apache.thrift.transport.TSocket;
+import org.apache.thrift.transport.TTransport;
 
-public class HTTPServer implements Server.Iface {
+public class ServerThrift implements Server.Iface {
     private int serverName;
     private int port;
     private HTTPServer nextServer, previousServer;
@@ -18,33 +25,60 @@ public class HTTPServer implements Server.Iface {
     private FileTree ft = new FileTree();
     private boolean isOnline = true;
     private Server.Processor processor;
+    private HashMap<Integer, Integer> servers = new HashMap<Integer, Integer>();
+    private int numServers = 0;
 
-    public HTTPServer(int port, int serverName) throws IOException {
-        processor = new Server.Processor(this);
+    public static void main(String[] args) throws IOException {
+        new ServerThrift(Integer.parseInt(args[0]));
+    }
 
+    public void loadFile(String filename) {
+        try {
+            BufferedReader reader = new BufferedReader(
+                new FileReader(filename)
+            );
+            String line = reader.readLine();
+
+            while (line != null) {
+                String[] s = line.split(" ");
+                int n = Integer.parseInt(s[0]);
+                int p = Integer.parseInt(s[1]);
+                this.servers.put(n, p);
+
+                // Read next line for while condition
+                line = reader.readLine();
+                numServers++;
+            }
+            reader.close();
+        } catch (IOException ioe) {
+            System.out.println(ioe.getMessage());
+        }
+    }
+
+    public ServerThrift(int serverName) throws IOException {
+        loadFile();
         this.port = port;
         this.serverName = serverName;
 
+        processor = new Server.Processor(this);
         Runnable run = new Runnable() {
             public void run() {
-                simple(processor, port);
+                try {
+                    TServerTransport serverTransport = new TServerSocket(port);
+                    TServer server = new TSimpleServer(
+                        new Args(serverTransport).processor(processor)
+                    );
+                    System.out.println("Starting server " + serverName + "...");
+                    server.serve();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         };
         new Thread(run).start();
     }
 
-    public void simple(Server.Processor processor, int port) {
-        try {
-            TServerTransport serverTransport = new TServerSocket(port);
-            TServer server = new TSimpleServer(
-                new Args(serverTransport).processor(processor)
-            );
-            System.out.println("Starting server " + serverName + "...");
-            server.serve();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+    public void CREATE(int port) { }
 
     public File getFile(String filepath) {
         return this.ft.getFile(filepath);
@@ -74,16 +108,36 @@ public class HTTPServer implements Server.Iface {
 
     public String GET(String path) throws org.apache.thrift.TException{
         File f = getFile(path);
+        String retorno = null;
+
         if (f != null) {
-            String header = "HTTP/1.1 200 OK\n" + "Verion: " + f.getVersion() + "\nCreation: "
+            System.out.println("GET "+ path +" accepted on server " + this.serverName);
+            String header = "HTTP/1.1 200 OK\n" + "Version: " + f.getVersion() + "\nCreation: "
             + f.getCreationTime() + "\nModification: " +
                     f.getModificationTime() + "\nContent-length: " +
                         f.getData().length() + '\n';
 
-            String retorno = header + f.getData()+"\n";
-            return retorno;
+            retorno = header + f.getData()+"\n";
         }
-        return null;
+        else {
+            int hash = path.hashCode() % this.numServers;
+
+            try {
+                TTransport transport;
+
+                transport = new TSocket("127.0.0.1", servers.get(hash));
+                transport.open();
+
+                TProtocol protocol = new TBinaryProtocol(transport);
+                Server.Client client = new Server.Client(protocol);
+
+                retorno = client.GET(path);
+                transport.close();
+            } catch (TException x) {
+                x.printStackTrace();
+            }
+        }
+        return retorno;
     }
 
     public String LIST(String path) throws org.apache.thrift.TException {
@@ -104,8 +158,30 @@ public class HTTPServer implements Server.Iface {
 
     public boolean ADD(String path, String data) throws
     org.apache.thrift.TException {
-        if (addFile(path, data) == null) return false;
-        else return true;
+        int hash = path.hashCode() % this.numServers;
+        boolean retorno = false;
+
+        if (hash == this.serverName) {
+            System.out.println("ADD " + path +" accepted on server " + this.serverName);
+            return addFile(path, data) == null;
+        }
+        else {
+            try {
+                TTransport transport;
+
+                transport = new TSocket("127.0.0.1", servers.get(hash));
+                transport.open();
+
+                TProtocol protocol = new TBinaryProtocol(transport);
+                Server.Client client = new Server.Client(protocol);
+
+                retorno = client.ADD(path, data);
+                transport.close();
+            } catch (TException x) {
+                x.printStackTrace();
+            }
+        }
+        return retorno;
     }
 
     public boolean UPDATE(String path, String data) throws
@@ -123,9 +199,8 @@ public class HTTPServer implements Server.Iface {
         return removeFile(path);
     }
 
-    public boolean UPDATE_VERSION(String path, String data, int version) throws         org.apache.thrift.TException {
+    public boolean UPDATE_VERSION(String path, String data, int version) throws org.apache.thrift.TException {
         File f = getFile(path);
-
         if (f != null && f.getVersion() == version) {
             f.addData(data);
             return true;
