@@ -23,15 +23,17 @@ public class Client {
             perform(client);
             transport.close();
         } catch (TException x) {
-            x.printStackTrace();
+            x.printStackTrace(); 
         }
     }
 
     private static void perform(Server.Client client)
     throws TException {
         client.ADD("/user", "eduardo");
-        client.ADD("/user/age", "21 anos");
+        //client.ADD("/user/age/", "21 anos");  
+        client.DELETE("user");  
         client.ADD("/coxinha", "viado");
+        System.out.println(client.LIST("/user"));
         System.out.println(client.GET("/user") + " - \n" + client.GET("/user/age"));
         System.out.println(client.GET("/coxinha"));
         //System.out.println(client.LIST("/user"));
