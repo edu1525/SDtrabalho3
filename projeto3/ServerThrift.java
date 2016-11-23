@@ -142,18 +142,41 @@ public class ServerThrift implements Server.Iface {
 
     public String LIST(String path) throws org.apache.thrift.TException {
         File file = getFile(path);
-        ArrayList<File> child = file.getChildren();
+        String retorno = null;
 
-        if (child != null) {
-            StringBuilder builder = new StringBuilder();
+        if(f != null){
+            ArrayList<File> child = file.getChildren();
 
-            for (File f : child) {
-                builder.append(f.getName()+"\n");
+            if (child != null) {
+                StringBuilder builder = new StringBuilder();
+
+                for (File f : child) {
+                    builder.append(f.getName()+"\n");
+                }
+                retorno =  builder.toString();
+            } 
+        } 
+
+        else{
+
+            int hash = path.hashCode() % this.numServers;
+
+            try {
+                TTransport transport;
+
+                transport = new TSocket("127.0.0.1", servers.get(hash));
+                transport.open();
+
+                TProtocol protocol = new TBinaryProtocol(transport);
+                Server.Client client = new Server.Client(protocol);
+
+                retorno = client.LIST(path);
+                transport.close();
+            } catch (TException x) {
+                x.printStackTrace();
             }
-            return builder.toString();
-        } else {
-            return null;
         }
+        return retorno;
     }
 
     public boolean ADD(String path, String data) throws
@@ -186,36 +209,119 @@ public class ServerThrift implements Server.Iface {
 
     public boolean UPDATE(String path, String data) throws
     org.apache.thrift.TException {
+
         File f = getFile(path);
+        int hash = path.hashCode() % this.numServers;
 
         if (f != null) {
             f.addData(data);
             return true;
-        } else
-            return false;
+
+        } else{
+
+            try {
+                TTransport transport;
+                transport = new TSocket("127.0.0.1", servers.get(hash));
+                transport.open();
+
+                TProtocol protocol = new TBinaryProtocol(transport);
+                Server.Client client = new Server.Client(protocol);
+
+                return client.UPDATE(path, data);
+                transport.close();
+
+            } catch (TException x) {
+                x.printStackTrace();
+                return false;
+
+            }
+        }            
     }
 
     public boolean DELETE(String path) throws org.apache.thrift.TException {
-        return removeFile(path);
+        int hash = path.hashCode() % this.numServers;
+
+        if(hash = this.serverName){
+            return removeFile(path);
+
+        } else{
+            try {
+                TTransport transport;
+                transport = new TSocket("127.0.0.1", servers.get(hash));
+                transport.open();
+
+                TProtocol protocol = new TBinaryProtocol(transport);
+                Server.Client client = new Server.Client(protocol);
+
+                return client.DELETE(path);
+                transport.close();
+
+            } catch (TException x) {
+                x.printStackTrace();
+                return false;
+
+            }
+
+        }
     }
 
     public boolean UPDATE_VERSION(String path, String data, int version) throws org.apache.thrift.TException {
         File f = getFile(path);
+        int hash = path.hashCode() % this.numServers;
+
         if (f != null && f.getVersion() == version) {
             f.addData(data);
             return true;
-        } else
-            return false;
+
+        } else if (f == null){
+            try {
+                TTransport transport;
+                transport = new TSocket("127.0.0.1", servers.get(hash));
+                transport.open();
+
+                TProtocol protocol = new TBinaryProtocol(transport);
+                Server.Client client = new Server.Client(protocol);
+
+                return client.UPDATE_VERSION(path, data, version);
+                transport.close();
+
+            } catch (TException x) {
+                x.printStackTrace();
+                return false;
+
+            }
+
+        } else return false;
     }
 
     public boolean DELETE_VERSION(String path, int version) throws
     org.apache.thrift.TException {
+        
+        int hash = path.hashCode() % this.numServers;
         File f = getFile(path);
 
         if (f != null && f.getVersion() == version) {
             return removeFile(path);
-        } else
-            return false;
+        } else if(f == null){
+            try {
+                TTransport transport;
+                transport = new TSocket("127.0.0.1", servers.get(hash));
+                transport.open();
+
+                TProtocol protocol = new TBinaryProtocol(transport);
+                Server.Client client = new Server.Client(protocol);
+
+                return client.DELETE_VERSION(path, version);
+                transport.close();
+
+            } catch (TException x) {
+                x.printStackTrace();
+                return false;
+
+            }
+
+        } else return false;
+            
     }
 
     public int getServerName() {
