@@ -124,7 +124,7 @@ public class ServerThrift implements Server.Iface {
             retorno = header + f.getData()+"\n";
         }
         else {
-            int hash = path.hashCode() % this.numServers;   
+            int hash = Math.abs(path.hashCode()) % this.numServers;   
             System.out.println("GET SENDED TO "+ hash+" with path: "+path);
             
 
@@ -139,6 +139,7 @@ public class ServerThrift implements Server.Iface {
 
                 retorno = client.GET(path);
                 transport.close();
+
             } catch (TException x) {
                 x.printStackTrace();
             }
@@ -165,7 +166,7 @@ public class ServerThrift implements Server.Iface {
         } 
 
         else{
-            int hash = path.hashCode() % this.numServers;
+            int hash = Math.abs(path.hashCode()) % this.numServers;
             System.out.println("LIST SENDED TO "+ hash+" with path: "+path);
             
 
@@ -189,12 +190,12 @@ public class ServerThrift implements Server.Iface {
 
     public boolean ADD(String path, String data) throws
     org.apache.thrift.TException {
-        int hash = path.hashCode() % this.numServers;
+        int hash = Math.abs(path.hashCode()) % this.numServers;
         boolean retorno = false;
 
         if (hash == this.serverName) {
             System.out.println("ADD " + path +" accepted on server " + this.serverName);
-            return addFile(path, data) == null;
+            return addFile(path, data) != null;
         }
         else {
             System.out.println("ADD SENDED TO "+ hash+" with path: "+path);
@@ -220,7 +221,7 @@ public class ServerThrift implements Server.Iface {
     org.apache.thrift.TException {
 
         File f = getFile(path);
-        int hash = path.hashCode() % this.numServers;
+        int hash = Math.abs(path.hashCode()) % this.numServers;
         boolean retorno = false;
 
         if (f != null) {
@@ -252,7 +253,7 @@ public class ServerThrift implements Server.Iface {
     }
 
     public boolean DELETE(String path) throws org.apache.thrift.TException {
-        int hash = path.hashCode() % this.numServers;
+        int hash = Math.abs(path.hashCode()) % this.numServers;
         boolean retorno = false; 
 
         if(hash == this.serverName){
@@ -284,7 +285,7 @@ public class ServerThrift implements Server.Iface {
 
     public boolean UPDATE_VERSION(String path, String data, int version) throws org.apache.thrift.TException {
         File f = getFile(path);
-        int hash = path.hashCode() % this.numServers;
+        int hash = Math.abs( path.hashCode()) % this.numServers;
         boolean retorno = false;
 
         if (f != null && f.getVersion() == version) {
@@ -319,7 +320,7 @@ public class ServerThrift implements Server.Iface {
     public boolean DELETE_VERSION(String path, int version) throws
     org.apache.thrift.TException {
         
-        int hash = path.hashCode() % this.numServers;
+        int hash = Math.abs(path.hashCode()) % this.numServers;
         File f = getFile(path);
         boolean retorno = false;
  
